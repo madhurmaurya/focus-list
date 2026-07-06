@@ -344,8 +344,8 @@ body {
 }
 @keyframes ov-blink { 0%,100%{opacity:1} 50%{opacity:.6} }
 
-/* Delete button */
-.del-btn {
+/* Edit button on card */
+.edit-btn {
   flex-shrink: 0;
   width: 44px;
   align-self: stretch;
@@ -353,16 +353,46 @@ body {
   align-items: center;
   justify-content: center;
   border: none;
+  border-left: 1px solid var(--panel-border);
   background: none;
   color: var(--text-faint);
   cursor: pointer;
   transition: all .15s ease;
   border-radius: 0 16px 16px 0;
+  padding: 0;
 }
-.del-btn svg { width: 16px; height: 16px; }
-.del-btn:active, .del-btn:hover {
+.edit-btn svg { width: 14px; height: 14px; }
+.edit-btn:active, .edit-btn:hover {
+  color: var(--mint);
+  background: rgba(74,222,156,0.07);
+}
+
+/* Delete button — lives in the edit sheet, not on the card */
+.sheet-delete-btn {
+  display: none;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1.5px solid var(--red-dim);
+  background: rgba(224,96,122,0.05);
   color: var(--red);
-  background: rgba(224,96,122,0.07);
+  cursor: pointer;
+  transition: all .15s ease;
+  min-height: 48px;
+  margin-top: 10px;
+  letter-spacing: .02em;
+}
+.sheet-delete-btn.visible { display: flex; }
+.sheet-delete-btn svg { width: 15px; height: 15px; }
+.sheet-delete-btn:active, .sheet-delete-btn:hover {
+  background: rgba(224,96,122,0.12);
+  border-color: var(--red);
 }
 
 .task.completed { opacity: .45; }
@@ -452,6 +482,8 @@ body {
   position: fixed;
   bottom: 0; left: 0; right: 0;
   max-width: 680px;
+  max-height: 92dvh;
+  max-height: 92vh;
   margin: 0 auto;
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -460,22 +492,32 @@ body {
   z-index: 55;
   transform: translateY(calc(100% + 4px));
   transition: transform .32s cubic-bezier(.4,0,.2,1);
-  padding: 0 18px calc(20px + var(--safe-b));
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .bottom-sheet::before {
   content: "";
   position: absolute; top: 0; left: 0; right: 0; height: 2px;
   background: linear-gradient(90deg, transparent 5%, var(--mint) 50%, transparent 95%);
   opacity: .8;
+  z-index: 1;
 }
 .bottom-sheet.is-open { transform: translateY(0); }
+
+.sheet-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 18px calc(20px + var(--safe-b));
+  flex: 1;
+}
 
 .sheet-handle {
   width: 38px; height: 4px;
   background: var(--panel-border);
   border-radius: 2px;
-  margin: 13px auto 20px;
+  margin: 13px auto 0;
+  flex-shrink: 0;
 }
 
 .sheet-eyebrow {
@@ -485,6 +527,7 @@ body {
   text-transform: uppercase;
   color: var(--mint);
   margin-bottom: 14px;
+  margin-top: 18px;
   opacity: .85;
 }
 
@@ -620,10 +663,11 @@ body {
   .app-brand h1 { font-size: 22px; }
   .filter-strip { padding: 11px 24px; }
   .list-area { padding: 16px 24px calc(96px + var(--safe-b)); }
-  .bottom-sheet { border-radius: 22px 22px 0 0; padding: 0 26px calc(26px + var(--safe-b)); }
+  .bottom-sheet { border-radius: 22px 22px 0 0; }
+  .sheet-scroll { padding: 0 26px calc(26px + var(--safe-b)); }
   .fab { bottom: calc(30px + var(--safe-b)); right: 28px; width: 62px; height: 62px; }
-  .del-btn { opacity: 0; }
-  .task:hover .del-btn { opacity: 1; }
+  .edit-btn { opacity: 0; }
+  .task:hover .edit-btn { opacity: 1; }
 }
 
 /* ── Task entry animation ── */
@@ -698,7 +742,8 @@ body {
 <!-- Bottom sheet -->
 <div class="bottom-sheet" id="bottomSheet">
   <div class="sheet-handle"></div>
-  <div class="sheet-eyebrow">New Task</div>
+  <div class="sheet-scroll">
+  <div class="sheet-eyebrow" id="sheetEyebrow">New Task</div>
 
   <input
     type="text"
@@ -729,10 +774,14 @@ body {
   </div>
 
   <button class="add-btn" id="addBtn">Add Task</button>
+  <button class="sheet-delete-btn" id="sheetDeleteBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+    Delete Task
+  </button>
+  </div>
 </div>
 
 <script>
-/* ── Storage ── */
 const STORAGE_KEY = 'neuro-tasks-state';
 const hasClaudeStorage = typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function';
 
@@ -752,6 +801,7 @@ let currentPF = 'all';
 let currentSort = 'priority';
 let selectedPriority = 'medium';
 let sheetOpen = false;
+let editingId = null;
 
 /* ── DOM ── */
 const listEl       = document.getElementById('list');
@@ -767,6 +817,8 @@ const fab          = document.getElementById('fab');
 const backdrop     = document.getElementById('backdrop');
 const sheet        = document.getElementById('bottomSheet');
 const overdueHstat = document.getElementById('overdueHstat');
+const sheetEyebrow = document.getElementById('sheetEyebrow');
+const sheetDeleteBtn = document.getElementById('sheetDeleteBtn');
 
 const PRIO_ORDER = { high: 3, medium: 2, low: 1 };
 
@@ -794,10 +846,11 @@ function fmtDue(str) {
 }
 
 /* ── SVGs ── */
-const SVG_CHECK    = '<svg viewBox="0 0 24 24" fill="none" stroke="#06251a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-const SVG_TRASH    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
-const SVG_CAL      = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>';
-const SVG_EMPTY    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
+const SVG_CHECK  = '<svg viewBox="0 0 24 24" fill="none" stroke="#06251a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+const SVG_TRASH  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
+const SVG_PENCIL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+const SVG_CAL    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>';
+const SVG_EMPTY  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
 
 /* ── Filter/sort ── */
 function getFiltered() {
@@ -848,11 +901,11 @@ function render() {
             ${overdue ? `<span class="overdue-tag">Overdue</span>` : ''}
           </div>
         </div>
-        <button class="del-btn" aria-label="Delete task">${SVG_TRASH}</button>
+        <button class="edit-btn" aria-label="Edit task">${SVG_PENCIL}</button>
       `;
       el.querySelector('.task-title').textContent = task.text;
       el.querySelector('.task-check').addEventListener('click', () => toggleComplete(task.id));
-      el.querySelector('.del-btn').addEventListener('click', () => deleteTask(task.id));
+      el.querySelector('.edit-btn').addEventListener('click', () => openEditSheet(task.id));
       listEl.appendChild(el);
     });
   }
@@ -876,31 +929,46 @@ function updateStats() {
 }
 
 /* ── Actions ── */
-function addTask() {
+function submitTask() {
   const text = taskInput.value.trim();
   if (!text) { taskInput.focus(); return; }
 
-  const el = document.createElement('div');
-  tasks.unshift({
-    id: uid(),
-    text,
-    priority: selectedPriority,
-    dueDate: dueInput.value || null,
-    completed: false,
-    createdAt: Date.now()
-  });
+  if (editingId) {
+    const t = tasks.find(t => t.id === editingId);
+    if (t) {
+      t.text     = text;
+      t.priority = selectedPriority;
+      t.dueDate  = dueInput.value || null;
+    }
+  } else {
+    tasks.unshift({
+      id: uid(),
+      text,
+      priority: selectedPriority,
+      dueDate: dueInput.value || null,
+      completed: false,
+      createdAt: Date.now()
+    });
+  }
 
-  taskInput.value = '';
-  dueInput.value  = '';
+  const wasEditing = !!editingId;
+  const savedId    = editingId;
   closeSheet();
   render();
   persist();
 
-  // Flash the first task card
-  const first = listEl.firstElementChild;
-  if (first && first.classList.contains('task')) {
-    first.classList.add('new');
-    setTimeout(() => first.classList.remove('new'), 300);
+  if (!wasEditing) {
+    const first = listEl.firstElementChild;
+    if (first && first.classList.contains('task')) {
+      first.classList.add('new');
+      setTimeout(() => first.classList.remove('new'), 300);
+    }
+  } else {
+    const updated = listEl.querySelector(`[data-id="${savedId}"]`);
+    if (updated) {
+      updated.classList.add('new');
+      setTimeout(() => updated.classList.remove('new'), 300);
+    }
   }
 }
 
@@ -925,6 +993,13 @@ function clearCompleted() {
 
 /* ── Sheet ── */
 function openSheet() {
+  editingId = null;
+  sheetEyebrow.textContent = 'New Task';
+  addBtn.textContent = 'Add Task';
+  taskInput.value = '';
+  dueInput.value  = '';
+  setActivePriority('medium');
+  sheetDeleteBtn.classList.remove('visible');
   sheetOpen = true;
   sheet.classList.add('is-open');
   backdrop.classList.add('visible');
@@ -932,27 +1007,61 @@ function openSheet() {
   setTimeout(() => taskInput.focus(), 80);
 }
 
+function openEditSheet(id) {
+  const t = tasks.find(t => t.id === id);
+  if (!t) return;
+  editingId = id;
+  sheetEyebrow.textContent = 'Edit Task';
+  addBtn.textContent = 'Save Changes';
+  taskInput.value = t.text;
+  dueInput.value  = t.dueDate || '';
+  setActivePriority(t.priority);
+  sheetDeleteBtn.classList.add('visible');
+  sheetOpen = true;
+  sheet.classList.add('is-open');
+  backdrop.classList.add('visible');
+  fab.classList.add('is-open');
+  setTimeout(() => { taskInput.focus(); taskInput.select(); }, 80);
+}
+
+function setActivePriority(p) {
+  selectedPriority = p;
+  [...priorityGrid.children].forEach(c => c.classList.toggle('active', c.dataset.p === p));
+}
+
 function closeSheet() {
   sheetOpen = false;
+  editingId = null;
   sheet.classList.remove('is-open');
   backdrop.classList.remove('visible');
   fab.classList.remove('is-open');
+  taskInput.value = '';
+  dueInput.value  = '';
+  sheetEyebrow.textContent = 'New Task';
+  addBtn.textContent = 'Add Task';
+  sheetDeleteBtn.classList.remove('visible');
+  setActivePriority('medium');
 }
 
 fab.addEventListener('click', () => sheetOpen ? closeSheet() : openSheet());
 backdrop.addEventListener('click', closeSheet);
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetOpen) closeSheet(); });
 
-/* ── Add task listeners ── */
-addBtn.addEventListener('click', addTask);
-taskInput.addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
+sheetDeleteBtn.addEventListener('click', () => {
+  const id = editingId;
+  closeSheet();
+  deleteTask(id);
+});
+
+/* ── Add/save task listeners ── */
+addBtn.addEventListener('click', submitTask);
+taskInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitTask(); });
 
 /* ── Priority picker ── */
 priorityGrid.addEventListener('click', e => {
   const btn = e.target.closest('.p-chip');
   if (!btn) return;
-  selectedPriority = btn.dataset.p;
-  [...priorityGrid.children].forEach(c => c.classList.toggle('active', c === btn));
+  setActivePriority(btn.dataset.p);
 });
 
 /* ── Filter strip (tabs + priority filters) ── */
