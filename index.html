@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Focus List</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
@@ -381,6 +382,29 @@
     transition: all .2s ease;
   }
   .clear-btn:hover{ border-color:#7a3c4a; color: var(--red); }
+@media (max-width:700px){
+body{padding:16px 12px 32px;}
+.stats-row,.add-row2,.filter-bar{flex-direction:column;align-items:stretch;}
+.stat,.add-btn,.date-input,.sort-select{width:100%;}
+.tabs,.priority-picker{display:grid;grid-template-columns:repeat(3,1fr);width:100%;}
+.priority-chip,.tab,.add-btn{padding:12px;}
+footer{flex-direction:column;gap:10px;align-items:stretch;}
+.clear-btn{width:100%;}
+.del-btn{opacity:1;}
+}
+
+@media (max-width:700px){
+.wrap{display:flex;flex-direction:column;}
+.add-card{order:1;position:sticky;top:0;z-index:20;background:var(--panel);box-shadow:0 8px 20px rgba(0,0,0,.35);}
+.filter-bar,.priority-filters{order:2;}
+.list{order:3;}
+header{margin-bottom:14px;}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.stat{padding:10px;}
+.list::before{content:"YOUR TASKS";display:block;font-family:'JetBrains Mono',monospace;color:var(--mint);font-size:12px;letter-spacing:.12em;margin:6px 2px 10px;}
+.task{margin-bottom:8px;border-radius:16px;}
+}
+
 </style>
 </head>
 <body>
@@ -439,7 +463,7 @@
     <button class="pf-chip" data-pf="high">High</button>
   </div>
 
-  <div class="list" id="list"></div>
+  <h2 style="font-size:18px;margin:8px 0 10px;">📋 Tasks</h2><div class="list" id="list"></div>
 
   <footer>
     <span id="statusText">syncing…</span>
@@ -449,7 +473,7 @@
 </div>
 
 <script>
-const STORAGE_KEY = 'faocus-tasks-state';
+const STORAGE_KEY = 'neuro-tasks-state';
 const hasClaudeStorage = (typeof window.storage !== 'undefined') && window.storage && typeof window.storage.get === 'function';
 
 async function storageGet(key){
